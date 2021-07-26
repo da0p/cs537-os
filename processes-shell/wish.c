@@ -66,9 +66,6 @@ char **create_search_paths (void) {
     char **paths = (char**) malloc(MAX_SEARCH_PATHS * sizeof(char*));
     if (paths == NULL) return NULL;
 
-    for (size_t i = 0; i < MAX_SEARCH_PATHS; i++)
-        paths[i] = NULL;
-
     return paths;
 }
 
@@ -76,7 +73,10 @@ int initialize_search_path(char **paths) {
     
     if (paths == NULL) return -1;
 
-    paths[0] = (char *) malloc((strlen(INITIAL_SEARCH_PATH) + 1) * sizeof(char));
+    for (size_t i = 0; i < MAX_SEARCH_PATHS; i++)
+        paths[i] = NULL;
+
+    paths[0] = (char *) calloc((strlen(INITIAL_SEARCH_PATH) + 1), sizeof(char));
     if (paths[0] == NULL) {
         free(paths);
         return -1;
@@ -209,15 +209,17 @@ int redirect_output (cmd_t *cmd) {
     if (cmd->num_files > 1)
         return -1;
 
-   int fd = open(cmd->fname[0], O_CREAT | O_RDWR,
+    if (cmd->fname != NULL && cmd->fname[0] != NULL) {
+        int fd = open(cmd->fname[0], O_CREAT | O_RDWR,
                                 S_IRUSR | S_IWUSR |
                                 S_IRGRP | S_IWGRP |
                                 S_IROTH | S_IWOTH);
 
-   if (fd != STDOUT_FILENO) {
-       dup2(fd, STDOUT_FILENO);
-       close(fd);
-   }
+        if (fd != -1 && fd != STDOUT_FILENO) {
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+    }
     return 0;
 }
 
@@ -298,8 +300,7 @@ int main (int argc, char *argv[]) {
         fp = fopen(argv[1], "r");
         if (fp == NULL) err_msg(1, true);
     }
-    paths = create_search_paths();
-    if (paths == NULL) err_msg(1, true);
+    if ((paths = create_search_paths()) == NULL) err_msg(1, true);
     if (initialize_search_path(paths) != 0) err_msg(1, true);
     while (eof != -1) {
         eof = read_line(rd_mode, &line, &n, fp);
